@@ -33,7 +33,7 @@ class Tools:
 
 class EmailOperation:
     
-    def __init__(self,status='success'):
+    def __init__(self,status):
         self.ses_client = self.sesClientObject()
         self.template_name = status+"_template"
         
@@ -41,6 +41,7 @@ class EmailOperation:
     def sesClientObject(self):
         try:
             return boto3.client('ses')
+            
         except ClientError as e:
             print("Error: while create boto3 sns client \n %s"%str(e))
             
@@ -58,7 +59,7 @@ class EmailOperation:
                 self.ses_client.update_template(
                         Template={
                             "TemplateName": self.template_name,
-                            "SubjectPart": "{{status}}:File Name: {{file_name}} || Date: {{date}}",
+                            "SubjectPart": "{{status}} : 'File Name': {{file_name}} || Date: {{date}}",
                             # "SubjectPart": "Subject",
                             "HtmlPart": "Hello Ankus HTML",
                             "TextPart": "Hello Ankus Text"
@@ -68,10 +69,10 @@ class EmailOperation:
         except ClientError as e:
             
             self.ses_client.create_template(
-                    Template={
-                        # "TemplateName": self.template_name,
-                        "SubjectPart": "{{status}}:File Name: {{file_name}} || Date: {{date}}",
-                        "SubjectPart": "Subject",
+                    Template =  {
+                        "TemplateName": self.template_name,
+                        "SubjectPart": "{{status}} : 'File Name': {{file_name}} || Date: {{date}}",
+                        # "SubjectPart": "Subject",
                         "HtmlPart": "Hello Ankus HTML",
                         "TextPart": "Hello Ankus Text"
                     }
@@ -150,14 +151,47 @@ def lambda_handler(event, context):
         #     print("Error: %s" %str(e))
         #     # raise e
         
+        status = None
+        error_reason = None
+        
+        try:
+            if file_prefix:
+                decider_folder = file_prefix.split('/')[0]
+                
+                if decider_folder.lower() == "success":
+                    status = "success"
+                elif decider_folder.lower() == "error":
+                    status = "error"
+                else:
+                    print("Undetected Folder")
+                    error_reason = "Undetected Folder"
+                    status = "error"
+            else:
+                status = "error"
+                error_reason = "No File Prefix || So Unable to determine the status."
+                # sys.exit("No File Prefix || So Unable to determine the status.")
+        except Exception as e:
+            sys.exit("Error: %s"%str(e))
         
         ##################Testing###################
         
-        test_mail_data = "{"status": 'success',"file_name": str(file_name),"date": str(Tools.get_datetime())}"
-
         
-        emailObj = EmailOperation('success')
+        ######Createing Test Dict#########
+        
+        test_data = {
+                'status': status,
+                'file_name': file_name,
+                'date': Tools.get_datetime()
+            }
+            
+        if error_reason:
+            test_data['error_reason'] = error_reason
+        
+        
+        emailObj = EmailOperation(status)
+                
+        # Tools.debugging("This is test",status,emailObj.template_name)
         
         if emailObj.createAndUpdateTemplate():
-            mailResponse = emailObj.sendEmail('iamankus7@gmail.com','iamankus7@gmail.com',test_mail_data)
+            mailResponse = emailObj.sendEmail('iamankus7@gmail.com','iamankus7@gmail.com',json.dumps(test_data))
             emailObj.mailStatus(mailResponse)
