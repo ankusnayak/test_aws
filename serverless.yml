@@ -1,0 +1,43 @@
+
+
+service: s3-trigger-event
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  stage: dev
+  region: ap-south-1
+  runtime: python3.8
+
+
+functions:
+  lambda_handler:
+    description: This Lambda function will (trigger) send a email when s3 bucket events occur.
+    handler: handler.lambda_handler
+    events:
+      - s3:
+          bucket: test-email-ankus
+          event: s3:ObjectCreated:Put
+    
+    iamRoleStatements:
+      - Effect: 'Allow'
+        Action:
+          - "s3:PutObject"
+        Resource:
+          - 'arn:aws:s3:::test-email'
+      - Effect: 'Allow'
+        Action:
+          - ses:*
+        Resource: "*"
+
+    package:
+      individually: true
+      patterns:
+        - '!/**'
+        # - 'dist/**'
+        - '!node_modules/**'
+
+
+plugins:
+  - serverless-iam-roles-per-function
